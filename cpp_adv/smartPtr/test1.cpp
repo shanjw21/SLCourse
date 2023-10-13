@@ -11,6 +11,7 @@
 
 */
 #include <iostream>
+#include <memory>
 using namespace std;
 
 template<typename T>
@@ -48,7 +49,7 @@ private:
     T* mptr;
 };
 
-#ifdef 0
+#if 0
 int main(){
     CSmartPtr<int>ptr1(new int);
     // 默认拷贝构造是浅拷贝，导致mptr指向的内存被释放了两次，产生野指针问题。free(): double free detected in tcache 2 Aborted (core dumped)
@@ -67,8 +68,76 @@ int main(){
 
 /*
     看提供的智能指针如何解决上述问题。
+    auto_ptr:
+    不推荐使用auto_ptr。 特别是在容器中例如：vector<auto_ptr<int>> vec1; vec2(vec1)
+    在容器拷贝时，容器内元素会大量拷贝，vec1中底层指针全部被置为nullptr,所以不能使用auto_ptr
+
+    scoped_ptr:
+    scoped_ptr(const scoped_ptr<T>&) = delete;
+    scoped_ptr<T>& operator=(const scoped_ptr<T>&) = delete;
+    将拷贝构造和拷贝赋值设为delete的，当调用scoped_ptr进行拷贝，编译器报错。
+
+    推荐使用unique_ptr:
+    unique_ptr(const unique_ptr<T>&) = delete;
+    unique_ptr<T>& operator=(const unique_ptr<T>&) = delete;
+    unique_ptr提供了带右值引用的移动构造函数和移动赋值运算符。
+    unique_ptr(unique_ptr<T>&&src);
+    unique_prt<T>& operator=(unique_ptr<T>&& src);
+
+    template<typename T>
+    unique_ptr<T>getSmartPtr(){
+        unique_ptr<T>ptr(new T());
+        return ptr;
+    }
+    // 栈上创建的临时对象，不用保存其资源，调用的是移动构造函数
+    unique_ptr<int>ptr1 = getSmartPtr<int>();
+    // 临时对象，调用的是移动赋值运算符。
+    ptr1 = getSmartPtr<int>();
 */
 
-int main(){
+#if 0
+int main1(){
 
+    // 永远让最后一个智能指针管理资源，前面的智能指针置为nullptr，
+    // 拷贝构造中调用release()。release()将ptr1的值赋予ptr2,然后将ptr1置空。
+    auto_ptr<int>ptr1(new int);
+    auto_ptr<int>ptr2(ptr1);
+    // 此时ptr1已经被置为空指针。
+    *ptr1 = 20;
+
+    // Segmentation fault (core dumped)
+    cout << "ptr1指向的内存值为: " << *ptr1 << endl;
+
+    *ptr2 = 30; 
+    cout << "ptr2指向的内存值为: " << *ptr2 << endl;
+    cout << "ptr1指向的内存值为: " << *ptr1 << endl;
+}
+#endif
+
+#if 0
+int main(){
+    unique_ptr<int>ptr1(new int);
+    // unique_ptr<int>ptr2(ptr1); use of deleted function
+    // std::move 右值引用，std::move得到当前变量的右值类型。
+    unique_ptr<int>ptr2(std::move(ptr1)); // 可以编译通过，但是运行访问ptr1报错。
+    *ptr1 = 20;// Segmentation fault (core dumped)，ptr1管理的资源已经移动了，不能再访问。
+
+    // Segmentation fault (core dumped)
+    cout << "ptr1指向的内存值为: " << *ptr1 << endl;
+
+    *ptr2 = 30; 
+    cout << "ptr2指向的内存值为: " << *ptr2 << endl;
+    cout << "ptr1指向的内存值为: " << *ptr1 << endl;
+}
+#endif 
+
+int main(){
+    shared_ptr<int>ptr1(new int);
+    shared_ptr<int>ptr2(ptr1); 
+    *ptr1 = 20;
+    cout << "ptr1指向的内存值为: " << *ptr1 << endl;
+
+    *ptr2 = 30; 
+    cout << "ptr2指向的内存值为: " << *ptr2 << endl;
+    cout << "ptr1指向的内存值为: " << *ptr1 << endl;
 }
